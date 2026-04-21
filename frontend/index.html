@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Google Pay - Secure Payments</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.1/build/qrcode.min.js"></script>
+</head>
+<body>
+    <div id="app">
+        <!-- Navigation Sidebar (Hidden on Login/Register) -->
+        <aside id="sidebar" class="hidden">
+            <div class="logo">Google Pay</div>
+            <nav>
+                <a href="#" onclick="showView('dashboard')">🏠 Dashboard</a>
+                <a href="#" onclick="showView('send-money')">💸 Send Money</a>
+                <a href="#" id="split-bill-link" onclick="showView('split-bill')">👥 Split Bill</a>
+                <a href="#" onclick="showView('refer-earn')">🎁 Refer & Earn</a>
+                <a href="#" onclick="showView('qr-scan')">📸 QR Scan</a>
+                <a href="#" id="bills-link" onclick="showView('bills')">🧾 Bills & Recharges</a>
+                <a href="#" onclick="showView('reminders')">⏰ Reminders</a>
+                <a href="#" onclick="showView('history')">📜 History</a>
+                <a href="#" id="admin-link" class="hidden" onclick="showView('admin-dashboard')">🛡️ Admin</a>
+                <a href="#" onclick="logout()">🚪 Logout</a>
+            </nav>
+        </aside>
+
+        <!-- Main Content Area -->
+        <main id="main-content">
+            <!-- Login View -->
+            <section id="login-view" class="view">
+                <div class="auth-card">
+                    <h2>Login to Google Pay</h2>
+                    <form onsubmit="handleLogin(event)">
+                        <input type="text" id="login-username" placeholder="Username" required>
+                        <input type="password" id="login-password" placeholder="Password" required>
+                        <button type="submit">Login</button>
+                    </form>
+                    <p>Don't have an account? <a href="#" onclick="showView('register')">Register</a></p>
+                </div>
+            </section>
+
+            <!-- Register View -->
+            <section id="register-view" class="view hidden">
+                <div class="auth-card">
+                    <h2>Register</h2>
+                    <form onsubmit="handleRegister(event)">
+                        <input type="text" id="reg-username" placeholder="Username" required>
+                        <input type="email" id="reg-email" placeholder="Email" required>
+                        <input type="text" id="reg-phone" placeholder="Phone Number" required>
+                        <input type="password" id="reg-password" placeholder="Password" required>
+                        <input type="text" id="reg-referral" placeholder="Referral Code (Optional)">
+                        <button type="submit">Register</button>
+                    </form>
+                    <p>Already have an account? <a href="#" onclick="showView('login')">Login</a></p>
+                </div>
+            </section>
+
+            <!-- Dashboard View -->
+            <section id="dashboard-view" class="view hidden">
+                <header>
+                    <h1>Welcome, <span id="display-name">User</span>!</h1>
+                </header>
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <h3>Total Balance</h3>
+                        <p id="total-balance">₹ 0.00</p>
+                    </div>
+                    <div class="stat-card">
+                        <h3>UPI ID</h3>
+                        <p id="display-upi">Not linked</p>
+                    </div>
+                </div>
+                <div class="actions">
+                    <!-- Actions dynamically loaded by app.js -->
+                </div>
+                <div id="recent-history">
+                    <h3>Recent Transactions</h3>
+                    <ul id="recent-history-list"></ul>
+                </div>
+                <div id="upcoming-reminders" style="margin-top: 30px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                        <h3>Upcoming Reminders</h3>
+                        <a href="#" onclick="showView('reminders')" style="font-size: 12px; color: var(--primary);">View All</a>
+                    </div>
+                    <div id="dashboard-reminders-list" class="grid" style="grid-template-columns: 1fr 1fr; gap: 15px;">
+                        <!-- Top 2 reminders -->
+                    </div>
+                </div>
+            </section>
+
+            <!-- Link Bank View -->
+            <section id="link-bank-view" class="view hidden">
+                <div class="card">
+                    <h2>Link Bank Account</h2>
+                    <form onsubmit="handleLinkBank(event)">
+                        <input type="text" id="bank-name" placeholder="Bank Name (e.g., HDFC)" required>
+                        <input type="text" id="account-number" placeholder="Account Number" required>
+                        <input type="text" id="ifsc" placeholder="IFSC Code" required>
+                        <input type="password" id="upi-pin" placeholder="Set 6-digit UPI PIN" maxlength="6" required>
+                        <div style="display: flex; gap: 10px;">
+                            <button type="button" class="secondary" onclick="showView('dashboard')">Cancel</button>
+                            <button type="submit">Link Account</button>
+                        </div>
+                    </form>
+                </div>
+            </section>
+
+            <!-- Send Money View -->
+            <section id="send-money-view" class="view hidden">
+                <div class="card">
+                    <h2>Send Money</h2>
+                    <form onsubmit="handleSendMoney(event)">
+                        <input type="text" id="send-identifier" placeholder="Phone Number or UPI ID" required>
+                        <input type="number" id="send-amount" placeholder="Amount (₹)" step="0.01" required>
+                        <input type="text" id="send-note" placeholder="Add a note (Optional)">
+                        <select id="send-bank-account"></select>
+                        <input type="password" id="send-upi-pin" placeholder="Enter UPI PIN" maxlength="6" required>
+                        <div style="display: flex; gap: 10px;">
+                            <button type="button" class="secondary" onclick="showView('dashboard')">Cancel</button>
+                            <button type="submit">Pay Now</button>
+                        </div>
+                    </form>
+                </div>
+            </section>
+
+            <!-- QR Scan View -->
+            <section id="qr-scan-view" class="view hidden">
+                <div class="card text-center">
+                    <h2>Your Payment QR</h2>
+                    <div id="qr-code"></div>
+                    <p id="qr-upi-id"></p>
+                    <hr>
+                    <h3>Scan to Pay</h3>
+                    <p>(Simulated) Enter UPI ID manually to mock scan</p>
+                    <input type="text" id="scan-manual-id" placeholder="Enter UPI ID to pay">
+                    <button onclick="handleScanManual()">Mock Scan & Pay</button>
+                </div>
+            </section>
+
+            <!-- History View -->
+            <section id="history-view" class="view hidden">
+                <h2>Transaction History</h2>
+                <div id="history-list-container">
+                    <table id="history-table">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Details</th>
+                                <th>Amount</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="history-body"></tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- Reminders View -->
+            <section id="reminders-view" class="view hidden">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                    <h2>Payment Reminders</h2>
+                    <button onclick="openAddReminderModal()">+ Add Reminder</button>
+                </div>
+                <div id="reminders-list" class="grid" style="grid-template-columns: 1fr 1fr; gap: 20px;">
+                    <!-- Reminders injected here -->
+                </div>
+
+                <!-- Add Reminder Modal -->
+                <div id="add-reminder-modal" class="modal hidden">
+                    <div class="modal-content" style="max-width: 500px;">
+                        <h2>Add Payment Reminder</h2>
+                        <form onsubmit="handleCreateReminder(event)">
+                            <label style="font-size: 12px; color: var(--text-secondary);">Title</label>
+                            <input type="text" id="rem-title" placeholder="e.g. House Rent, Internet Bill" required>
+                            
+                            <div class="grid" style="grid-template-columns: 1fr 1fr; gap: 15px;">
+                                <div>
+                                    <label style="font-size: 12px; color: var(--text-secondary);">Amount (₹)</label>
+                                    <input type="number" id="rem-amount" placeholder="0.00" step="0.01" required>
+                                </div>
+                                <div>
+                                    <label style="font-size: 12px; color: var(--text-secondary);">Due Date</label>
+                                    <input type="date" id="rem-date" required>
+                                </div>
+                            </div>
+
+                            <label style="font-size: 12px; color: var(--text-secondary);">Category</label>
+                            <select id="rem-category" required>
+                                <option value="mobile">Mobile Recharge</option>
+                                <option value="electricity">Electricity Bill</option>
+                                <option value="dth">DTH</option>
+                                <option value="broadband">Broadband</option>
+                                <option value="rent">Rent</option>
+                                <option value="other">Other</option>
+                            </select>
+
+                            <div style="display: flex; gap: 10px; margin-top: 15px;">
+                                <button type="button" class="secondary" onclick="closeModal('add-reminder-modal')" style="margin-bottom: 0;">Cancel</button>
+                                <button type="submit" style="margin-bottom: 0;">Set Reminder</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Bills View -->
+            <section id="bills-view" class="view hidden">
+                <h2>Bills & Recharges</h2>
+                <div class="grid">
+                    <div class="bill-card" onclick="openBillModal('mobile')">📱 Mobile</div>
+                    <div class="bill-card" onclick="openBillModal('electricity')">💡 Electricity</div>
+                    <div class="bill-card" onclick="openBillModal('dth')">📺 DTH</div>
+                    <div class="bill-card" onclick="openBillModal('broadband')">🌐 Broadband</div>
+                </div>
+                <div id="bill-modal" class="modal hidden">
+                    <div class="modal-content" style="max-width: 600px;">
+                        <h2 id="bill-modal-title">Pay Bill</h2>
+                        <form onsubmit="handlePayBill(event)">
+                            <input type="hidden" id="bill-type">
+                            
+                            <div class="grid" style="grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
+                                <div>
+                                    <label style="font-size: 12px; color: var(--text-secondary);">Provider</label>
+                                    <input type="text" id="biller-name" placeholder="e.g. Airtel, Jio" required style="margin-bottom: 0;">
+                                </div>
+                                <div>
+                                    <label style="font-size: 12px; color: var(--text-secondary);">Consumer ID / Number</label>
+                                    <input type="text" id="customer-id" placeholder="Enter ID" required style="margin-bottom: 0;">
+                                </div>
+                            </div>
+
+                            <div id="plans-container" style="margin-bottom: 20px;">
+                                <label style="display: block; margin-bottom: 10px; font-weight: 600;">Select a Plan</label>
+                                <div id="plans-list" style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; max-height: 250px; overflow-y: auto; padding: 5px;">
+                                    <!-- Plans will be injected here -->
+                                </div>
+                            </div>
+
+                            <div class="grid" style="grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
+                                <div>
+                                    <label style="font-size: 12px; color: var(--text-secondary);">Selected Amount (₹)</label>
+                                    <input type="number" id="bill-amount" placeholder="Amount" step="0.01" required style="background: #ffffff;">
+                                </div>
+                                <div>
+                                    <label style="font-size: 12px; color: var(--text-secondary);">Payment Account</label>
+                                    <select id="bill-bank-account" style="margin-bottom: 0;"></select>
+                                </div>
+                            </div>
+
+                            <input type="password" id="bill-upi-pin" placeholder="Enter UPI PIN to authorize" maxlength="6" required>
+                            
+                            <div style="display: flex; gap: 10px; margin-top: 10px;">
+                                <button type="button" class="secondary" onclick="closeModal('bill-modal')" style="margin-bottom: 0;">Cancel</button>
+                                <button type="submit" style="margin-bottom: 0;">Confirm Payment</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Refer & Earn View -->
+            <section id="refer-earn-view" class="view hidden">
+                <div class="card text-center" style="padding: 40px 20px;">
+                    <div style="font-size: 60px; margin-bottom: 20px;">🎁</div>
+                    <h2>Refer & Earn ₹200</h2>
+                    <p style="color: var(--text-secondary); margin-bottom: 30px; max-width: 400px; margin-left: auto; margin-right: auto;">
+                        Invite your friends to Google Pay. When they register using your code, you both get rewarded!
+                    </p>
+                    
+                    <div style="background: #f8f9fa; border: 2px dashed #dadce0; padding: 20px; border-radius: 12px; display: inline-block; min-width: 250px;">
+                        <p style="font-size: 12px; text-transform: uppercase; letter-spacing: 1px; color: var(--text-secondary); margin-bottom: 10px;">Your Referral Code</p>
+                        <h1 id="my-referral-code" style="letter-spacing: 5px; color: var(--primary); margin-bottom: 15px;">------</h1>
+                        <button class="secondary" onclick="copyReferralCode()" style="margin-bottom: 0;">Copy Code</button>
+                    </div>
+
+                    <div style="margin-top: 40px; display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; text-align: left;">
+                        <div style="padding: 15px; background: #fff; border-radius: 8px; box-shadow: var(--card-shadow);">
+                            <div style="font-weight: bold; color: var(--primary); margin-bottom: 5px;">Step 1</div>
+                            <div style="font-size: 13px;">Share your unique code with friends.</div>
+                        </div>
+                        <div style="padding: 15px; background: #fff; border-radius: 8px; box-shadow: var(--card-shadow);">
+                            <div style="font-weight: bold; color: var(--primary); margin-bottom: 5px;">Step 2</div>
+                            <div style="font-size: 13px;">They sign up using your code.</div>
+                        </div>
+                        <div style="padding: 15px; background: #fff; border-radius: 8px; box-shadow: var(--card-shadow);">
+                            <div style="font-weight: bold; color: var(--primary); margin-bottom: 5px;">Step 3</div>
+                            <div style="font-size: 13px;">Receive ₹200 directly in your account!</div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+            <section id="split-bill-view" class="view hidden">
+                <div class="card">
+                    <h2>Split a Bill</h2>
+                    <form onsubmit="handleCreateSplit(event)">
+                        <input type="text" id="split-desc" placeholder="Description (e.g., Dinner at Taj)" required>
+                        <input type="number" id="split-total" placeholder="Total Amount (₹)" step="0.01" required>
+                        <textarea id="split-members" placeholder="Enter friend's phone numbers (one per line)" required style="width: 100%; padding: 12px; margin-bottom: 16px; border: 1px solid #dadce0; border-radius: 4px;"></textarea>
+                        <div style="display: flex; gap: 10px;">
+                            <button type="button" class="secondary" onclick="showView('dashboard')">Cancel</button>
+                            <button type="submit">Create Split</button>
+                        </div>
+                    </form>
+                </div>
+                <div id="pending-splits" class="mt-4">
+                    <h3>Your Split Bills</h3>
+                    <div id="split-list"></div>
+                </div>
+            </section>
+
+            <!-- Admin Dashboard View -->
+            <section id="admin-dashboard-view" class="view hidden">
+                <h2>Admin Dashboard</h2>
+                <div class="stats-grid">
+                    <div class="stat-card"><h3>Total Users</h3><p id="admin-total-users">0</p></div>
+                    <div class="stat-card"><h3>Total Volume</h3><p id="admin-total-volume">₹ 0</p></div>
+                    <div class="stat-card"><h3>Failed Txns</h3><p id="admin-failed-txns">0</p></div>
+                </div>
+                <h3>Users List</h3>
+                <div id="admin-users-list"></div>
+                <h3>All Transactions</h3>
+                <div id="admin-transactions-list"></div>
+            </section>
+
+            <!-- OTP Verification View -->
+            <section id="otp-view" class="view hidden">
+                <div class="auth-card">
+                    <h2>Verify Phone</h2>
+                    <p>Check your messages for OTP (Simulation: Use 123456)</p>
+                    <form onsubmit="handleVerifyOTP(event)">
+                        <input type="hidden" id="otp-phone">
+                        <input type="text" id="otp-input" placeholder="Enter 6-digit OTP" maxlength="6" required>
+                        <button type="submit">Verify</button>
+                    </form>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- Success Modal -->
+    <div id="success-modal" class="modal hidden">
+        <div class="modal-content text-center">
+            <div class="success-icon">✔️</div>
+            <h2 id="success-title">Success!</h2>
+            <p id="success-message"></p>
+            <button onclick="closeModal('success-modal')">OK</button>
+        </div>
+    </div>
+
+    <!-- Payment Verification Modal -->
+    <div id="payment-modal" class="modal hidden">
+        <div class="modal-content text-center">
+            <div id="payment-modal-header" style="margin-bottom: 20px;">
+                <h2 style="margin-bottom: 8px;">Verify Payment</h2>
+                <p id="payment-modal-details" style="color: var(--text-secondary); font-size: 14px;"></p>
+            </div>
+            
+            <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 20px; border-left: 4px solid var(--primary);">
+                <p style="font-size: 12px; text-transform: uppercase; letter-spacing: 1px; color: var(--text-secondary); margin-bottom: 5px;">Secure Transaction ID</p>
+                <input type="password" id="modal-payment-pin" 
+                       placeholder="••••••" 
+                       style="text-align: center; font-size: 24px; letter-spacing: 10px; margin-bottom: 0; background: #f8f9fa; border: none; padding: 5px; width: 100%;" 
+                       maxlength="6" autocomplete="off">
+            </div>
+
+            <p style="font-size: 13px; color: var(--text-secondary); margin-bottom: 20px;">
+                Enter your 6-digit payment code to authorize this transaction via 
+                <span id="modal-masked-phone" style="color: var(--primary); font-weight: 600;"></span>
+            </p>
+
+            <div style="display: flex; gap: 10px;">
+                <button type="button" class="secondary" onclick="closePaymentModal()" style="margin-bottom: 0;">Cancel</button>
+                <button type="button" id="confirm-payment-btn" style="margin-bottom: 0;">Authorize</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notifications Container -->
+    <div id="toast-container"></div>
+
+    <script src="app.js?v=2.0"></script>
+</body>
+</html>
