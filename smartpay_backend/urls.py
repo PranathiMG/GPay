@@ -1,8 +1,10 @@
 from django.contrib import admin
 from django.urls import path, include
+from django.views.generic import TemplateView
 from users.views import HealthView
 
 urlpatterns = [
+    path('', TemplateView.as_view(template_name='index.html'), name='index'),
     path('admin/', admin.site.urls),
     path('api/v1/auth/', include('users.urls')),
     path('api/v1/bank/', include('bank.urls')),

@@ -1,5 +1,7 @@
 console.log("Google Pay App JS Loaded");
-const API_BASE = 'http://localhost:8000/api/v1';
+const API_BASE = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || window.location.hostname === '::1' || window.location.hostname.includes('::'))
+    ? window.location.protocol + '//' + window.location.hostname + (window.location.port ? ':' + window.location.port : '') + '/api/v1'
+    : window.location.origin + '/api/v1';
 let user = null;
 let token = localStorage.getItem('access_token');
 let refreshToken = localStorage.getItem('refresh_token');
@@ -137,7 +139,17 @@ window.handleRegister = async function(e) {
         toast(res.data.message);
         showView('otp');
     } catch (err) {
-        toast("Registration failed: " + JSON.stringify(err.response?.data));
+        let msg = "Registration failed. ";
+        if (err.response?.data) {
+            if (typeof err.response.data === 'string' && err.response.data.includes('<!DOCTYPE html>')) {
+                msg += "Server error. Please ensure you have run 'python manage.py migrate'.";
+            } else {
+                msg += JSON.stringify(err.response.data);
+            }
+        } else {
+            msg += "Connection error.";
+        }
+        toast(msg);
     }
 };
 
